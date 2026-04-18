@@ -1,0 +1,9 @@
+# Full stack for `python3 main.py` (export is stdlib-only; train + chat need the rest).
+# Setup:
+#   python3 -m venv .venv && source .venv/bin/activate
+#   pip install -r requirements.txt
+
+torch>=2.1
+transformers>=4.40
+peft>=0.11
+sentencepiece>=0.1.99
