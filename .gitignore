@@ -1,3 +1,10 @@
+# =============================================================================
+# message-yourself — repository root
+# =============================================================================
+# Package-specific ignores (venv, this tree’s `sft_output.json`, experiment dumps)
+# also live under e.g. `imessageWithContextSelfExperimentation/.gitignore` so each
+# folder is self-documenting. Git applies every `.gitignore` from root down.
+
 # --- OS & editors ---
 .DS_Store
 .AppleDouble
@@ -9,7 +16,7 @@ Thumbs.db
 .idea/
 *.sublime-*
 
-# --- Python ---
+# --- Python (global) ---
 __pycache__/
 *.py[cod]
 *$py.class
@@ -39,11 +46,26 @@ MANIFEST
 venv/
 ENV/
 env/
+
+# --- Secrets (never commit) ---
 .env
 .env.*
 !.env.example
+!**/.env.example
+!.env*.example
+!**/.env*.example
+*.pem
+*.key
+id_rsa
+id_rsa.*
+*.p12
+*.pfx
+credentials.json
+client_secret*.json
+**/secrets/
+.secrets/
 
-# --- Test / type / lint caches ---
+# --- Test / tool caches ---
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -55,13 +77,17 @@ htmlcov/
 .nox/
 coverage.xml
 *.cover
-
-# --- Jupyter ---
 .ipynb_checkpoints/
 
-# --- ML / this project (large or personal) ---
-# Base weights + LoRA outputs (use `git add -f` if you really need a tiny adapter in-repo)
+# --- ML artifacts (any subfolder) ---
 models/
+checkpoints/
+checkpoint-*/
+outputs/
+wandb/
+lightning_logs/
+mlruns/
+tensorboard_logs/
 *.safetensors
 *.bin
 *.pt
@@ -69,16 +95,37 @@ models/
 *.ckpt
 *.onnx
 *.gguf
+*.h5
+*.joblib
+*.npy
+*.npz
+**/tinker_lora_adapter/
+**/tinker_lora_sft_adapter/
 
-# Exported message corpora (regenerate with export_imessage)
+# --- Caches inside repo ---
+.cache/
+.huggingface/
+
+# --- Large generated text corpora (default: ignore) ---
+**/cpt_out.txt
 cpt_out.txt
-sft_output.json
-sft_output.txt
+**/sft_output.txt
 messages_export.txt
+**/sft_output.json
+
+# --- Slack bulk exports ---
+my_slack_messages*.json
+**/*copy*.json
+
+# --- Tinker: heavy / sensitive API captures ---
+**/sft_tinker_api_dump.json
+**/cpt_tinker_metadata.json
+**/tinker_api_full_response.json
+**/rl_tinker_metadata.json
 
 # --- Logs & temp ---
 *.log
 tmp/
 temp/
-.cache/
-wandb/
+*.tmp
+*.temp

@@ -1,0 +1,21 @@
+# Slack export + Tinker CPT / inference
+#
+# Python: 3.11+ required. The official `tinker` wheel declares Requires-Python >=3.11;
+# a 3.9/3.10 venv will fail with "Package 'tinker' requires a different Python".
+#
+#   brew install python@3.12          # macOS if you only have 3.9
+#   cd slack && rm -rf .venv
+#   python3.12 -m venv .venv          # or python3.11
+#   source .venv/bin/activate
+#   pip install -U pip
+#   pip install -r requirements.txt
+#
+#   export TINKER_API_KEY=...         # https://tinker-console.thinkingmachines.ai/
+
+requests
+tinker
+orjson
+tinker-cookbook
+torch
+python-dotenv
+openai>=1.0.0

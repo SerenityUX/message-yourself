@@ -1,0 +1,7 @@
+# Same packages as requirements.txt (kept for older notes / scripts).
+# Prefer: pip install -r requirements.txt
+
+torch>=2.1
+transformers>=4.40
+peft>=0.11
+sentencepiece>=0.1.99

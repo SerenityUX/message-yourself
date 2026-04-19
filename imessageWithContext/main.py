@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
 Interactive entrypoint: choose train vs chat, then CPT vs SFT when training.
+SFT can run locally (PEFT) or on Tinker GPUs (``TINKER_API_KEY`` in ``imessage/.env``).
 
   python3 main.py
 
 Train: export iMessage → ``cpt_out.txt`` + ``sft_output.json``, then one LoRA stage.
-Chat: inference only (adapter under ``models/``; prefers ``messages-lora-sft``).
+Chat: **Tinker only** — sampler from ``sft_tinker_metadata.json`` or ``TINKER_CHAT_MODEL_URI`` (no local PEFT chat).
 
-Requires: ``pip install -r requirements.txt`` for train + chat.
+Requires: ``pip install -r requirements.txt`` for train + chat. Tinker SFT needs Python 3.11+.
 """
 
 from __future__ import annotations
@@ -55,7 +56,7 @@ def main() -> None:
             "\n[main] Which LoRA?\n"
             "──────────────────\n"
             "  1 — CPT  (text corpus → models/messages-lora-cpt)\n"
-            "  2 — SFT  (reply pairs → models/messages-lora-sft)\n",
+            "  2 — SFT  (reply pairs → local adapter or Tinker LoRA)\n",
             flush=True,
         )
         stage = _pick(
@@ -75,10 +76,50 @@ def main() -> None:
             print("\n[main] === CPT → models/messages-lora-cpt ===\n", flush=True)
             run_cpt()
         else:
-            from sft import run_sft
+            print(
+                "\n[main] SFT backend\n"
+                "─────────────────\n"
+                "  1 — Local  (PEFT on this machine → models/messages-lora-sft)\n"
+                "  2 — Tinker (remote LoRA on openai/gpt-oss-120b; needs TINKER_API_KEY + Python 3.11+)\n",
+                flush=True,
+            )
+            sft_backend = _pick(
+                "Local or Tinker?",
+                hint="Type 1 or 2, or local / tinker",
+                choices={
+                    "1": "local",
+                    "2": "tinker",
+                    "local": "local",
+                    "tinker": "tinker",
+                },
+            )
+            if sft_backend == "local":
+                from sft import run_sft
 
-            print("\n[main] === SFT → models/messages-lora-sft ===\n", flush=True)
-            run_sft()
+                print("\n[main] === SFT (local) → models/messages-lora-sft ===\n", flush=True)
+                run_sft()
+            else:
+                if sys.version_info < (3, 11):
+                    raise SystemExit(
+                        "\n[main] Tinker SFT needs Python 3.11+ (your interpreter is "
+                        f"{sys.version.split()[0]}: {sys.executable}).\n"
+                        "  cd imessageWithContext && rm -rf .venv && python3.12 -m venv .venv && source .venv/bin/activate\n"
+                        "  pip install -r requirements.txt\n"
+                        "Then run main.py again and choose Train → SFT → Tinker.\n"
+                    )
+                try:
+                    from sft_tinker import run_sft_tinker
+                except ImportError as exc:
+                    raise SystemExit(
+                        "Tinker SFT could not import dependencies. With Python 3.11+:\n"
+                        "  pip install -r requirements.txt\n"
+                        f"  ({exc})"
+                    ) from exc
+                print(
+                    "\n[main] === SFT (Tinker) → checkpoint in sft_tinker_metadata.json ===\n",
+                    flush=True,
+                )
+                run_sft_tinker()
 
         try:
             follow = input("\n[main] Open chat after training? [Y/n]: ").strip().lower()

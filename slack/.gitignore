@@ -1,0 +1,31 @@
+# =============================================================================
+# slack — copy-friendly .gitignore
+# =============================================================================
+# Pair with repo root `.gitignore`. See README “Git & environment”.
+
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+models/
+**/tinker_lora_adapter/
+**/tinker_lora_sft_adapter/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+
+# Large Slack exports (see root `my_slack_messages*.json` too)
+my_slack_messages*.json
+
+**/cpt_tinker_metadata.json
+**/rl_tinker_metadata.json
+**/tinker_api_full_response.json
+
+cpt_out.txt

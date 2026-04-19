@@ -1,0 +1,18 @@
+# imessage — local overrides. Root `.gitignore` also ignores `**/sft_output.json` here.
+
+.env
+.env.*
+!.env.example
+
+__pycache__/
+.venv/
+venv/
+models/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+
+cpt_out.txt
+messages_export.txt

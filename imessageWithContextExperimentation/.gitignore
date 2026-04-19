@@ -1,0 +1,29 @@
+# =============================================================================
+# imessageWithContextExperimentation — copy-friendly .gitignore
+# =============================================================================
+# Used with the repo root `.gitignore`. See README “Git & environment” in this folder.
+
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+models/
+**/tinker_lora_adapter/
+**/tinker_lora_sft_adapter/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+
+cpt_out.txt
+messages_export.txt
+
+**/sft_tinker_api_dump.json
+
+# experiment_results/ — tracked (eval JSON, rubrics)

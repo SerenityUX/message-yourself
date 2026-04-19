@@ -1,0 +1,39 @@
+# =============================================================================
+# imessageWithContextSelfExperimentation — copy-friendly .gitignore
+# =============================================================================
+# Used together with the repo root `.gitignore`. If you copy only this folder
+# into a new repo, copy these patterns (and README “Git & environment”) there.
+
+# --- Secrets (never commit `.env`; do commit `.env.example`) ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# --- Local training weights ---
+models/
+**/tinker_lora_adapter/
+**/tinker_lora_sft_adapter/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+
+# --- Large text exports (regenerate from Messages) ---
+cpt_out.txt
+messages_export.txt
+
+# --- `sft_output.json` stays untracked (iMessage text can contain pasted secrets; GitHub blocks push). ---
+# (Covered by root `**/sft_output.json`.)
+
+# --- Tinker request/response dumps (large; may echo payloads) ---
+**/sft_tinker_api_dump.json
+
+# --- Intentionally NOT listed (tracked in git) ---
+# experiment_results/   — scenario JSON, rubrics, manifests, agent logs, base_results/

@@ -1,0 +1,18 @@
+# Full stack for `python3 main.py` (export is stdlib-only). Chat here is Tinker-only (openai);
+# torch/transformers/peft are for local CPT/SFT when you choose those train paths.
+# Tinker SFT (`sft_tinker.py`, main → SFT → Tinker) needs Python 3.11+ and the Tinker lines below.
+# Setup:
+#   python3.12 -m venv .venv && source .venv/bin/activate
+#   pip install -r requirements.txt
+#
+#   export TINKER_API_KEY=...   # or imessage/.env — https://tinker-console.thinkingmachines.ai/
+
+torch>=2.1
+transformers>=4.40
+peft>=0.11
+sentencepiece>=0.1.99
+python-dotenv>=1.0.0
+orjson
+tinker
+tinker-cookbook
+openai>=1.0.0
