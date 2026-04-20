@@ -29,9 +29,9 @@ Use **`.env.example`** as the template. Never commit **`.env`**.
 
 See **`.gitignore`** in this directory (replicable if you vendor only this tree).
 
-**Tracked:** `experiment_results/**`, source, `.env.example`. **`sft_output.json` is not committed** (may contain secrets in message bodies); keep it locally.
+**Tracked:** source, `.env.example`. **`experiment_results/**` is not committed** (manifests include `tinker://` URIs and local paths). Only `experiment_results/.gitkeep` (and `-2`/`-3` placeholders) stays in git.
 
-**Ignored:** `.env`, `**/sft_tinker_api_dump.json`, `models/`, weight blobs, `.venv/`, large exports (`cpt_out.txt`, `messages_export.txt`).
+**Ignored:** `.env`, `**/sft_tinker_metadata.json`, `**/sft_tinker_api_dump.json`, `sft_output.json`, `models/`, weight blobs, `.venv/`, large exports (`cpt_out.txt`, `messages_export.txt`).
 
 Root **`.gitignore`** still applies for repo-wide rules.
 

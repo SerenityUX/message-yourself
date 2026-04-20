@@ -35,8 +35,7 @@ This folder includes **`.gitignore`** (same rules can be copied if you split thi
 
 **Tracked (safe to commit):**
 
-- `experiment_results/**` — per–(lr,rank) folders with scenario JSON, rubrics, `manifest.json`, agent log/history, `base_results/`, etc.
-- `.env.example`, source, `README.md`.
+- `.env.example`, source, `README.md`. **`experiment_results/**` is not committed** (contains `tinker://` URIs, absolute paths, rubrics). Only `experiment_results/.gitkeep` is in git; regenerate runs locally.
 
 **Not committed (keep locally only):**
 
@@ -45,7 +44,7 @@ This folder includes **`.gitignore`** (same rules can be copied if you split thi
 **Ignored:**
 
 - `.env` and any secret files.
-- `**/sft_tinker_api_dump.json` — large API captures.
+- `**/sft_tinker_api_dump.json`, `**/sft_tinker_metadata.json` — large API captures and checkpoint metadata.
 - `models/`, `*.safetensors`, `*.bin`, … local weights.
 - `.venv/`, `__pycache__/`.
 - `cpt_out.txt`, `messages_export.txt` (large regenerated exports).
