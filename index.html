@@ -25,8 +25,20 @@
 <link rel="mask-icon" href="favicon.svg" color="#F5A623" />
 <link rel="canonical" href="https://serenityux.github.io/message-yourself/" />
 
-<!-- Repo root: run JSON under ./CLI/experiment_results/ (override with MESSAGE_YOURSELF_DATA_BASE if needed) -->
-<script>window.MESSAGE_YOURSELF_DATA_BASE = "CLI/experiment_results";</script>
+<!-- Static eval data: ``eval_bundle.json`` at repo root (rebuild: ``python3 scripts/build_eval_bundle.py``). __REPO_ROOT_URL__ fixes GitHub Pages without a trailing slash. -->
+<script>
+(function () {
+  if (typeof window.MESSAGE_YOURSELF_DATA_BASE === "undefined") {
+    window.MESSAGE_YOURSELF_DATA_BASE = "imessageWithContextSelfExperimentation/experiment_results";
+  }
+  var u = new URL(window.location.href);
+  var p = u.pathname;
+  if (p.endsWith("index.html")) p = p.slice(0, -10);
+  if (!p.endsWith("/")) p += "/";
+  u.pathname = p;
+  window.__REPO_ROOT_URL__ = u.href;
+})();
+</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -832,6 +844,7 @@
     padding: 4px 8px;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 2px;
     font-family: 'JetBrains Mono', monospace;
     font-size: 11.5px;
@@ -842,7 +855,9 @@
   .glass-nav .nav-track {
     position: relative;
     display: flex;
+    flex-wrap: nowrap;
     gap: 2px;
+    justify-content: center;
   }
   .glass-nav a {
     position: relative;
@@ -877,12 +892,33 @@
     will-change: transform, width;
   }
   @media (max-width: 640px) {
+    section[id] { scroll-margin-top: 112px; }
     .glass-nav {
       top: 10px;
       font-size: 10.5px;
-      padding: 3px 6px;
+      padding: 6px 8px;
+      border-radius: 18px;
+      max-width: calc(100vw - 14px);
+      overflow: visible;
+      flex-wrap: wrap;
     }
-    .glass-nav a { padding: 7px 10px; letter-spacing: 0.02em; }
+    .glass-nav .nav-track {
+      flex-wrap: wrap;
+      justify-content: center;
+      row-gap: 6px;
+      column-gap: 4px;
+      max-width: 100%;
+    }
+    .glass-nav a {
+      padding: 7px 10px;
+      letter-spacing: 0.02em;
+      flex: 1 1 calc(50% - 6px);
+      min-width: calc(50% - 8px);
+      max-width: calc(50% - 4px);
+      text-align: center;
+      box-sizing: border-box;
+    }
+    .sun { display: none !important; }
   }
 
   /* footer */
@@ -902,7 +938,6 @@
   @media (max-width: 640px) {
     main { padding: 32px 16px 80px; }
     body { font-size: 17.5px; }
-    .sun { width: 80px; height: 80px; top: 30px; right: 20px; }
     .imsg-body {
       display: flex;
       flex-direction: column;
@@ -1168,72 +1203,39 @@ python3 cli.py</pre>
 
 </main>
 
-<!-- ============== DATA ============== -->
-<script id="eval-data" type="application/json">
-{
-  "sweep": [
-    ["3e-05", 8, 4.75],
-    ["2e-05", 8, 4.667],
-    ["1.5e-05", 8, 4.708],
-    ["1e-05", 4, 4.708],
-    ["1e-05", 2, 4.708],
-    ["2.25e-05", 4, 4.708],
-    ["7.5e-06", 4, 4.708],
-    ["2.75e-05", 4, 4.667],
-    ["2.25e-05", 8, 4.667],
-    ["2.75e-05", 8, 4.667],
-    ["2e-05", 32, 4.667],
-    ["2.75e-05", 2, 4.667],
-    ["1e-05", 32, 4.667],
-    ["1e-05", 8, 4.583],
-    ["2e-05", 4, 4.583],
-    ["1.5e-05", 4, 4.458],
-    ["3.125e-05", 8, 4.458],
-    ["1e-05", 16, 4.417],
-    ["5e-06", 2, 4.375],
-    ["2e-05", 2, 4.333],
-    ["2.5e-05", 32, 4.333],
-    ["2.5e-05", 8, 4.292],
-    ["7.5e-06", 8, 4.292],
-    ["2.75e-05", 16, 4.258],
-    ["1.5e-05", 32, 4.25],
-    ["1.5e-05", 16, 4.208],
-    ["2.25e-05", 32, 4.167],
-    ["2.25e-05", 2, 4.167],
-    ["2.25e-05", 16, 4.125],
-    ["3e-05", 32, 4.0],
-    ["1.5e-05", 2, 4.0],
-    ["0.0001", 4, 3.892],
-    ["2.5e-05", 4, 3.85],
-    ["3e-05", 4, 3.833],
-    ["4e-05", 8, 3.833],
-    ["2.875e-05", 8, 3.817],
-    ["2e-05", 16, 3.792],
-    ["0.0002", 32, 3.708],
-    ["3.75e-06", 8, 3.667],
-    ["3.5e-05", 8, 3.625],
-    ["5e-06", 4, 3.625],
-    ["3e-05", 2, 3.417],
-    ["2.5e-05", 16, 3.458],
-    ["7.5e-06", 2, 3.292],
-    ["2.5e-06", 8, 3.208],
-    ["3.75e-06", 4, 3.167],
-    ["2.75e-05", 32, 3.083],
-    ["2.5e-06", 4, 2.833],
-    ["5e-05", 16, 2.842],
-    ["base", "—", 2.842]
-  ]
-}
-</script>
+<!-- Fallback only if ``eval_bundle.json`` fails to load -->
+<script id="eval-data" type="application/json">{"sweep":[]}</script>
 
 <script>
-(function(){
-  const data = JSON.parse(document.getElementById('eval-data').textContent);
+(async function(){
+  let data;
+  window.__EVAL_BUNDLE_RUNS__ = null;
+  try {
+    const bundleUrl = new URL("eval_bundle.json", window.__REPO_ROOT_URL__ || window.location.href).href;
+    const res = await fetch(bundleUrl, { cache: "no-store" });
+    if (!res.ok) throw new Error(String(res.status));
+    const bundle = await res.json();
+    data = { sweep: bundle.sweep || [] };
+    window.__EVAL_BUNDLE_RUNS__ = bundle.runs || {};
+  } catch (e) {
+    console.warn("[eval] eval_bundle.json:", e);
+    data = JSON.parse(document.getElementById("eval-data").textContent);
+  }
 
   // lr value → folder segment used by github import (e.g. 2.5e-05 → "2p5e-05", 1e-05 stays, 0.0001 → "0p0001")
   // Where run JSON lives, relative to this HTML file.
-  // Default: run folders live under CLI/experiment_results/ relative to this file at repo root.
+  // Default: run folders under MESSAGE_YOURSELF_DATA_BASE (repo-relative). Fetches use __REPO_ROOT_URL__ so GitHub Pages works without a trailing slash on the path.
   const DATA_BASE = (window.MESSAGE_YOURSELF_DATA_BASE || '').replace(/\/$/, '');
+  const REPO_ROOT = window.__REPO_ROOT_URL__ || window.location.href;
+  function runJsonUrl(folder, sid) {
+    const rel = `${folder}/${sid}.json`.replace(/^\//, "");
+    const cfg = (window.MESSAGE_YOURSELF_DATA_BASE || "").trim();
+    if (/^https?:\/\//i.test(cfg)) {
+      const base = cfg.endsWith("/") ? cfg : cfg + "/";
+      return new URL(rel, base).href;
+    }
+    return new URL(rel, REPO_ROOT).href;
+  }
 
   function lrToFolder(lrStr, rank) {
     if (lrStr === "base") return DATA_BASE ? `${DATA_BASE}/base_results` : "base_results";
@@ -1322,19 +1324,53 @@ python3 cli.py</pre>
 
   // --- Cache: folder → { hike_invite: {turns, rubric, title}, ... } ---
   const cache = {};
+  function turnsFromRaw(rawTurns) {
+    const out = [];
+    for (const t of rawTurns || []) {
+      let role, text;
+      if (Array.isArray(t) && t.length >= 2) {
+        role = t[0];
+        text = t[1];
+      } else if (t && typeof t === "object") {
+        role = t.role;
+        text = t.text;
+      } else continue;
+      if (role !== "friend" && role !== "thomas") continue;
+      const leak = isLeak(String(text || ""));
+      out.push(leak ? [role, text, "leak"] : [role, text]);
+    }
+    return out;
+  }
   async function loadRun(folder) {
     if (cache[folder]) return cache[folder];
+    const br = window.__EVAL_BUNDLE_RUNS__;
+    if (br && br[folder]) {
+      const raw = br[folder];
+      const scenarios = {};
+      for (const sid of scenarioOrder) {
+        const sc = raw[sid];
+        if (!sc) {
+          scenarios[sid] = { title: scenarioMeta[sid].title, turns: [], rubric: null, error: "missing in bundle" };
+          continue;
+        }
+        const turns = turnsFromRaw(sc.turns);
+        scenarios[sid] = {
+          title: sc.title || scenarioMeta[sid].title,
+          turns,
+          rubric: sc.rubric || null,
+        };
+      }
+      cache[folder] = scenarios;
+      return scenarios;
+    }
     const scenarios = {};
     await Promise.all(scenarioOrder.map(async sid => {
       try {
-        const res = await fetch(`${folder}/${sid}.json`);
+        const res = await fetch(runJsonUrl(folder, sid));
         if (!res.ok) throw new Error(res.status);
         const j = await res.json();
         const rawTurns = j.dialogue.turns || [];
-        const turns = rawTurns.map(t => {
-          const leak = isLeak(t.text);
-          return leak ? [t.role, t.text, 'leak'] : [t.role, t.text];
-        });
+        const turns = turnsFromRaw(rawTurns);
         scenarios[sid] = {
           title: j.dialogue.scenario_title || scenarioMeta[sid].title,
           turns,
@@ -1350,7 +1386,7 @@ python3 cli.py</pre>
 
   // --- sweep table ---
   const sweepRoot = document.getElementById('sweep-rows');
-  const clean = data.sweep.filter(r => r[0] !== "3.541").sort((a,b)=>b[2]-a[2]);
+  const clean = (data.sweep || []).slice().sort((a,b)=>b[2]-a[2]);
   clean.forEach((r, i) => {
     const [lrStr, rank, score] = r;
     const w = Math.round((score / 5) * 100);
@@ -1400,9 +1436,9 @@ python3 cli.py</pre>
     const s = scenarios[activeSid];
     const side = scenarioMeta[activeSid];
     const label = runLabel(lrStr, rank);
-    const isBest = folder === 'lr3e-05_r8';
+    const isBest = /(^|\/)lr3e-05_r8$/.test(folder);
     const tagline = isBest ? 'the winner' :
-                    folder === 'base_results' ? 'gpt-oss-120b, no fine-tuning' :
+                    /base_results$/.test(folder) ? 'gpt-oss-120b, no fine-tuning' :
                     `mean ${score.toFixed(3)}/5`;
 
     let bubbles = '';

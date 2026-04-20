@@ -24,7 +24,13 @@ Never commit **`.env`**. Always commit **`.env.example`** templates.
 
 ## Static site (GitHub Pages)
 
-Landing page at repo root: **`index.html`**, **`favicon.svg`**. The page loads eval run JSON from **`CLI/experiment_results/`** by default (`MESSAGE_YOURSELF_DATA_BASE` in `index.html`).
+Landing page at repo root: **`index.html`**, **`favicon.svg`**. The page loads **`eval_bundle.json`** (dialogue + rubrics only, no checkpoint paths). Regenerate after new evals:
+
+```bash
+python3 scripts/build_eval_bundle.py
+```
+
+Fallback: per-scenario fetches from **`imessageWithContextSelfExperimentation/experiment_results/`** if the bundle is missing (`MESSAGE_YOURSELF_DATA_BASE` in `index.html`).
 
 **Local preview:** from repo root, `python3 -m http.server 8000`, then open http://localhost:8000/
 
