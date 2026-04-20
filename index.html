@@ -25,8 +25,8 @@
 <link rel="mask-icon" href="favicon.svg" color="#F5A623" />
 <link rel="canonical" href="https://serenityux.github.io/message-yourself/" />
 
-<!-- This copy lives in the main repo at /site/; run JSON lives in /CLI/experiment_results/ -->
-<script>window.MESSAGE_YOURSELF_DATA_BASE = "../CLI/experiment_results";</script>
+<!-- Repo root: run JSON under ./CLI/experiment_results/ (override with MESSAGE_YOURSELF_DATA_BASE if needed) -->
+<script>window.MESSAGE_YOURSELF_DATA_BASE = "CLI/experiment_results";</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1232,8 +1232,7 @@ python3 cli.py</pre>
 
   // lr value → folder segment used by github import (e.g. 2.5e-05 → "2p5e-05", 1e-05 stays, 0.0001 → "0p0001")
   // Where run JSON lives, relative to this HTML file.
-  // Default (site-only repo): run folders sit next to index.html.
-  // Inside the main repo at /site/, point up one level to CLI/experiment_results/.
+  // Default: run folders live under CLI/experiment_results/ relative to this file at repo root.
   const DATA_BASE = (window.MESSAGE_YOURSELF_DATA_BASE || '').replace(/\/$/, '');
 
   function lrToFolder(lrStr, rank) {
