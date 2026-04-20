@@ -11,7 +11,7 @@
 <!-- Open Graph -->
 <meta property="og:type" content="website" />
 <meta property="og:title" content="Message Yourself" />
-<meta property="og:description" content="Fine-tune an LLM on your iMessage history so it sounds like you. Open-source, local training, 51 runs of an automated hyperparameter sweep." />
+<meta property="og:description" content="Fine-tune an LLM on your iMessage history so it sounds like you. Open-source, local training, 48 scored runs in the published eval bundle." />
 <meta property="og:image" content="favicon.svg" />
 <meta property="og:site_name" content="Message Yourself" />
 
@@ -1082,17 +1082,17 @@
 
     <p>I wrote an eval where Claude plays a friend in four scripted text-message conversations — a hike invite, a confide, a café follow-up, a podcast scheduling — and then grades the transcript on six rubrics: <em>Realistic</em>, <em>Kind</em>, <em>Casual</em>, <em>Concise</em>, <em>No-Repeat</em>, <em>Natural</em>.</p>
 
-    <p>First pass: nine runs spread across a reasonable band of learning rates and ranks. Best mean score was <strong>3.75/5</strong>. Not bad, not great, and the differences between runs were small enough that picking the next combo by hand felt arbitrary.</p>
+    <p>Trying a few learning rates and ranks by hand, I couldn’t pick a clear winner from the transcripts alone — the differences were too subtle without a score.</p>
 
-    <p>So I gave Claude the wheel. It could queue training runs, read the eval scores as they landed, and decide what to try next. It ran for hours — I went to the grocery store — and eventually converged on <strong>lr=3e-5, rank=8</strong> with a mean of <strong>4.75/5</strong>.</p>
+    <p>So I gave Claude the wheel: it could queue training runs, read the eval scores as they landed, and propose what to try next. The results baked into <code>eval_bundle.json</code> (same data as the table below) put the top mean at <strong>4.708/5</strong>. The top row — highest score, then sort order — is <strong><code>lr=1.25e-5</code>, <code>rank=16</code></strong>. Three other trained combos tie that exact mean (<code>lr=1.25e-5</code> <code>rank=4</code>, <code>lr=3.5e-5</code> <code>rank=32</code>, <code>lr=5e-5</code> <code>rank=32</code>); the UI marks all of them with ★.</p>
 
     <div class="stats">
       <div class="cell">
-        <div class="big">51</div>
-        <div class="lbl">runs completed</div>
+        <div class="big">48</div>
+        <div class="lbl">runs in bundle</div>
       </div>
       <div class="cell">
-        <div class="big">4.75<span class="frac">/5</span></div>
+        <div class="big">4.7<span class="frac">/5</span></div>
         <div class="lbl">best mean rubric</div>
       </div>
       <div class="cell">
@@ -1100,8 +1100,8 @@
         <div class="lbl">base model (no ft)</div>
       </div>
       <div class="cell">
-        <div class="big">3e-5</div>
-        <div class="lbl">winning lr · rank 8</div>
+        <div class="big">1.25e-5</div>
+        <div class="lbl">top row · lr=1.25e-5 · r16</div>
       </div>
     </div>
 
@@ -1126,9 +1126,9 @@
   <!-- ================== REFLECTION ================== -->
   <section id="reflection">
     <h2><span class="num">04</span>What it sounds like</h2>
-    <p class="dek">notes from the best run.</p>
+    <p class="dek">notes from a top-scoring run (e.g. <code>lr=1.25e-5</code>, <code>rank=16</code>).</p>
 
-    <p>The winning configuration — <code>lr=3e-5, rank=8</code> — scores a 4.75/5 mean rubric. What that means in practice: the model stops leaking its own reasoning tags (that <code>analysisassistantfinal</code> nonsense you see in the base model), and it replies in one or two short lines like a real friend texting from the car.</p>
+    <p>At <strong>4.7/5</strong> mean rubric, the table’s number-one row is <code>lr=1.25e-5</code>, <code>rank=16</code> (others tie the same mean — see ★). In practice the model stops leaking its own reasoning tags (that <code>analysisassistantfinal</code> nonsense you see in the base model), and it replies in one or two short lines like a real friend texting from the car.</p>
 
     <p>It is <em>not</em> me. It's a decent impression. If you ask it something factual about my life it will confidently invent an answer. But for the shape and rhythm of a text thread — the kind, casual, concise signal — it's the closest I've gotten.</p>
   </section>
@@ -1218,7 +1218,7 @@ python3 cli.py</pre>
     return DATA_BASE ? `${DATA_BASE}/${folder}` : folder;
   }
 
-  // friendly label, e.g. "3e-5 · r8"
+  // friendly label, e.g. "1.25e-5 · r16"
   function runLabel(lrStr, rank) {
     if (lrStr === "base") return "base · no ft";
     // shorten exponent notation 3e-05 → 3e-5 for display
@@ -1314,11 +1314,19 @@ python3 cli.py</pre>
     }
     return out;
   }
+  function bundleRunForFolder(br, folder) {
+    if (!br) return null;
+    if (br[folder]) return br[folder];
+    const prefixed = `imessageWithContextSelfExperimentation/experiment_results/${folder}`;
+    return br[prefixed] || null;
+  }
+
   async function loadRun(folder) {
     if (cache[folder]) return cache[folder];
     const br = window.__EVAL_BUNDLE_RUNS__;
-    if (br && br[folder]) {
-      const raw = br[folder];
+    const rawBundle = bundleRunForFolder(br, folder);
+    if (rawBundle) {
+      const raw = rawBundle;
       const scenarios = {};
       for (const sid of scenarioOrder) {
         const sc = raw[sid];
@@ -1360,13 +1368,16 @@ python3 cli.py</pre>
   // --- sweep table ---
   const sweepRoot = document.getElementById('sweep-rows');
   const clean = (data.sweep || []).slice().sort((a,b)=>b[2]-a[2]);
+  const topSweepScore = clean.length ? clean[0][2] : null;
+  const topSweepTieCount = topSweepScore === null ? 0 : clean.filter(r => r[2] === topSweepScore).length;
   clean.forEach((r, i) => {
     const [lrStr, rank, score] = r;
     const w = Math.round((score / 5) * 100);
     const folder = lrToFolder(lrStr, rank);
     const row = document.createElement('button');
     row.type = 'button';
-    row.className = 'row sweep-row' + (i === 0 ? ' best' : '');
+    const isTop = topSweepScore !== null && score === topSweepScore;
+    row.className = 'row sweep-row' + (isTop ? ' best' : '');
     row.dataset.folder = folder;
     row.dataset.lr = lrStr;
     row.dataset.rank = rank;
@@ -1376,7 +1387,7 @@ python3 cli.py</pre>
       <span class="rk">${lrStr}</span>
       <span class="rk">${rank}</span>
       <span class="score">${score.toFixed(3)}</span>
-      <span class="star">${i === 0 ? '★' : ''}</span>`;
+      <span class="star">${isTop ? '★' : ''}</span>`;
     row.addEventListener('click', () => selectRun(folder, lrStr, rank, score, row));
     sweepRoot.appendChild(row);
   });
@@ -1409,8 +1420,8 @@ python3 cli.py</pre>
     const s = scenarios[activeSid];
     const side = scenarioMeta[activeSid];
     const label = runLabel(lrStr, rank);
-    const isBest = /(^|\/)lr3e-05_r8$/.test(folder);
-    const tagline = isBest ? 'the winner' :
+    const isBest = topSweepScore !== null && score === topSweepScore;
+    const tagline = isBest ? (topSweepTieCount > 1 ? 'tied for best' : 'the winner') :
                     /base_results$/.test(folder) ? 'gpt-oss-120b, no fine-tuning' :
                     `mean ${score.toFixed(3)}/5`;
 
