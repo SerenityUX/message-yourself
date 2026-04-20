@@ -1,0 +1,1616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Message Yourself — an experiment in sounding like you</title>
+<meta name="description" content="An open-source experiment: fine-tune an LLM on your iMessage history so it sounds like you. Raw messages stay on your laptop; only LoRA weights travel." />
+<meta name="author" content="Thomas Stubblefield" />
+<meta name="theme-color" content="#cfe4f4" />
+
+<!-- Open Graph -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Message Yourself" />
+<meta property="og:description" content="Fine-tune an LLM on your iMessage history so it sounds like you. Open-source, local training, 51 runs of an automated hyperparameter sweep." />
+<meta property="og:image" content="favicon.svg" />
+<meta property="og:site_name" content="Message Yourself" />
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="Message Yourself" />
+<meta name="twitter:description" content="Fine-tune an LLM on your iMessage history so it sounds like you. Open-source." />
+<meta name="twitter:image" content="favicon.svg" />
+
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="mask-icon" href="favicon.svg" color="#F5A623" />
+<link rel="canonical" href="https://serenityux.github.io/message-yourself/" />
+
+<!-- This copy lives in the main repo at /site/; run JSON lives in /CLI/experiment_results/ -->
+<script>window.MESSAGE_YOURSELF_DATA_BASE = "../CLI/experiment_results";</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --ink: #1b2236;
+    --ink-soft: #4a556e;
+    --ink-faint: #7a85a1;
+    --paper: #fafbff;
+    --line: rgba(27, 34, 54, 0.12);
+    --line-strong: rgba(27, 34, 54, 0.22);
+    --sky-top: #9ecbff;
+    --sky-mid: #cde4ff;
+    --sky-bot: #fde9d0;
+    --accent: oklch(0.55 0.13 265);
+    --accent-soft: oklch(0.92 0.04 265);
+    --imsg-blue: #0b84fe;
+    --imsg-blue-dark: #0b74e0;
+    --imsg-gray: #e9e9eb;
+    --imsg-gray-ink: #000;
+    --warn: oklch(0.55 0.13 40);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'EB Garamond', 'Iowan Old Style', Georgia, serif;
+    font-size: 19px;
+    line-height: 1.55;
+    color: var(--ink);
+    background:
+      radial-gradient(ellipse at 80% 10%, rgba(255,240,200,.55), transparent 50%),
+      radial-gradient(ellipse at 10% 0%, rgba(255,255,255,.75), transparent 55%),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 35%, #f4f4ec 70%, var(--sky-bot) 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* decorative soft clouds */
+  .sky-clouds {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    overflow: hidden;
+  }
+  .cloud {
+    position: absolute;
+    background: #fff;
+    border-radius: 50%;
+    filter: blur(18px);
+    opacity: 0.55;
+  }
+  .cloud.c1 { width: 380px; height: 110px; top: 6vh; left: -60px; }
+  .cloud.c2 { width: 260px; height: 80px; top: 22vh; right: -40px; opacity: .5; }
+  .cloud.c3 { width: 520px; height: 140px; top: 48vh; left: 20vw; opacity: .35; }
+  .cloud.c4 { width: 300px; height: 90px; top: 72vh; right: 5vw; opacity: .45; }
+  .cloud.c5 { width: 200px; height: 60px; top: 90vh; left: 4vw; opacity: .4; }
+
+  /* sun */
+  .sun {
+    position: fixed;
+    top: 70px; right: 8vw;
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 40%, #fff5c2, #ffd983 55%, #f7b96a);
+    box-shadow: 0 0 80px rgba(255, 217, 131, 0.6);
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  main {
+    position: relative;
+    z-index: 1;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 56px 24px 120px;
+  }
+
+  /* Header */
+  .masthead {
+    text-align: center;
+    padding: 40px 0 24px;
+    position: relative;
+  }
+  .eyebrow {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-size: 18px;
+    color: var(--ink-soft);
+    letter-spacing: 0.02em;
+    margin: 0 0 6px;
+  }
+  h1.title {
+    font-family: 'EB Garamond', serif;
+    font-weight: 500;
+    font-style: italic;
+    font-size: clamp(56px, 11vw, 108px);
+    line-height: 0.95;
+    letter-spacing: -0.015em;
+    margin: 0;
+    color: var(--ink);
+    text-wrap: balance;
+  }
+  .title .amp {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    color: var(--accent);
+  }
+  .subtitle {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-size: clamp(18px, 2.4vw, 22px);
+    color: var(--ink-soft);
+    margin: 16px auto 0;
+    max-width: 560px;
+    text-wrap: pretty;
+  }
+  .meta {
+    margin-top: 28px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .meta a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted currentColor; }
+  .meta a:hover { color: var(--ink); }
+
+  /* Section typography */
+  section { margin-top: 72px; }
+  h2 {
+    font-family: 'EB Garamond', serif;
+    font-weight: 500;
+    font-size: 36px;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0 0 6px;
+  }
+  h2 .num {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    color: var(--accent);
+    font-size: 28px;
+    margin-right: 8px;
+  }
+  h3 {
+    font-family: 'EB Garamond', serif;
+    font-weight: 600;
+    font-size: 22px;
+    margin: 28px 0 6px;
+  }
+  .dek {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    color: var(--ink-soft);
+    font-size: 20px;
+    margin: 0 0 24px;
+  }
+  p { margin: 0 0 14px; text-wrap: pretty; }
+  p a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(98, 106, 207, 0.35); }
+  p a:hover { color: var(--ink); border-bottom-color: var(--ink); }
+
+  code, .mono {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.85em;
+    background: rgba(27, 34, 54, 0.06);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  /* Callout */
+  .pullquote {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-size: 26px;
+    line-height: 1.35;
+    color: var(--ink);
+    border-left: 2px solid var(--accent);
+    padding: 4px 0 4px 22px;
+    margin: 28px 0;
+    text-wrap: pretty;
+  }
+
+  /* ——— iMessage Desktop Window (glassmorphic) ——— */
+  .imsg {
+    position: relative;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.38) 100%);
+    backdrop-filter: saturate(180%) blur(22px);
+    -webkit-backdrop-filter: saturate(180%) blur(22px);
+    border: 1px solid rgba(255,255,255,0.75);
+    border-radius: 14px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.95) inset,
+      0 0 0 1px rgba(27,34,54,0.06),
+      0 28px 70px -28px rgba(27,34,54,0.45),
+      0 8px 24px -8px rgba(27,34,54,0.18);
+    overflow: hidden;
+    margin: 28px 0;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  }
+  /* highlight sheen along top edge */
+  .imsg::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.95) 50%, transparent);
+    pointer-events: none;
+    z-index: 3;
+  }
+  .imsg-titlebar {
+    height: 38px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    padding: 0 12px;
+    background: linear-gradient(180deg, rgba(248,249,252,0.75), rgba(234,236,242,0.55));
+    border-bottom: 1px solid rgba(255,255,255,0.6);
+    box-shadow: 0 1px 0 rgba(27,34,54,0.06);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .traffic { display: flex; gap: 8px; align-items: center; }
+  .traffic span {
+    width: 12px; height: 12px; border-radius: 50%;
+    display: inline-block;
+  }
+  .traffic .r { background: #ff5f57; border: 0.5px solid #e0443e;}
+  .traffic .y { background: #febc2e; border: 0.5px solid #dea123;}
+  .traffic .g { background: #28c840; border: 0.5px solid #1aab29;}
+  .imsg-title {
+    text-align: center;
+    font-size: 13px;
+    color: #1d1d1f;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+  .imsg-title .sub {
+    display: block;
+    font-size: 10px;
+    color: #86868b;
+    font-weight: 400;
+    margin-top: 1px;
+  }
+  .imsg-tools {
+    display: flex; gap: 14px;
+    color: #8e8e93; font-size: 16px;
+  }
+  .imsg-tools svg { display: block; }
+
+  .imsg-body {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    min-height: 420px;
+    background: transparent;
+  }
+  .imsg-sidebar {
+    background: linear-gradient(180deg, rgba(246,246,248,0.55), rgba(240,241,246,0.35));
+    border-right: 1px solid rgba(255,255,255,0.55);
+    box-shadow: 1px 0 0 rgba(27,34,54,0.04);
+    padding: 10px 0;
+    font-size: 13px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  .imsg-search {
+    margin: 2px 10px 10px;
+    background: rgba(0,0,0,0.06);
+    border-radius: 6px;
+    padding: 5px 8px;
+    color: #8e8e93;
+    font-size: 12px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .imsg-convo {
+    padding: 8px 10px;
+    display: flex; gap: 10px;
+    border-left: 3px solid transparent;
+    align-items: flex-start;
+  }
+  .imsg-convo.active { background: #e3e3e5; border-left-color: transparent; }
+  .imsg-convo .avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: linear-gradient(135deg, #a1c4fd, #c2e9fb);
+    color: #fff; font-weight: 600;
+    display: grid; place-items: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .imsg-convo .avatar.b { background: linear-gradient(135deg, #fbc2eb, #a6c1ee); }
+  .imsg-convo .avatar.c { background: linear-gradient(135deg, #84fab0, #8fd3f4); }
+  .imsg-convo .avatar.d { background: linear-gradient(135deg, #ffecd2, #fcb69f); }
+  .imsg-convo .meta-col { min-width: 0; flex: 1; }
+  .imsg-convo .name { font-weight: 600; color: #000; font-size: 13px; }
+  .imsg-convo .preview { color: #8e8e93; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .imsg-convo .time { font-size: 11px; color: #8e8e93; }
+
+  .imsg-chat {
+    display: flex; flex-direction: column;
+    background: rgba(255,255,255,0.35);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  .imsg-chat-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.5);
+    box-shadow: 0 1px 0 rgba(27,34,54,0.04);
+    text-align: center;
+    font-size: 13px;
+    color: #1d1d1f;
+    font-weight: 500;
+    background: linear-gradient(180deg, rgba(255,255,255,0.4), rgba(255,255,255,0.15));
+  }
+  .imsg-chat-header .tag {
+    font-size: 11px;
+    color: #8e8e93;
+    margin-top: 2px;
+  }
+  .imsg-messages {
+    padding: 14px 20px 10px;
+    display: flex; flex-direction: column; gap: 2px;
+    flex: 1;
+    overflow-y: auto;
+    max-height: 460px;
+  }
+  .imsg-convo { cursor: pointer; transition: background 0.1s; }
+  .imsg-convo:hover { background: rgba(0,0,0,0.04); }
+  .imsg-convo.active { background: #e3e3e5 !important; }
+  .imsg-date {
+    text-align: center;
+    font-size: 11px;
+    color: #8e8e93;
+    margin: 6px 0 10px;
+  }
+  .imsg-date strong { color: #3a3a3c; font-weight: 600; }
+
+  .bubble-row { display: flex; margin-top: 2px; }
+  .bubble-row.me { justify-content: flex-end; }
+  .bubble-row.them { justify-content: flex-start; }
+  .bubble-row + .bubble-row.gap { margin-top: 10px; }
+
+  .bubble {
+    max-width: 72%;
+    padding: 8px 14px;
+    border-radius: 1.15rem;
+    font-size: 14.5px;
+    line-height: 1.32;
+    color: #000;
+    position: relative;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  }
+  .bubble.them { background: rgba(233,233,235,0.92); color: #000; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); box-shadow: 0 1px 2px rgba(27,34,54,0.06); }
+  .bubble.me { background: linear-gradient(180deg, #1e90ff 0%, #0b84fe 100%); color: #fff; box-shadow: 0 1px 2px rgba(11,132,254,0.35), 0 6px 16px -6px rgba(11,132,254,0.45); }
+
+  /* iMessage tail via ellipse-radius trick (AllThingsSmitty/diqidoq) */
+  .bubble.tail::before,
+  .bubble.tail::after {
+    content: "";
+    position: absolute;
+    bottom: -0.1rem;
+    height: 1rem;
+  }
+  /* them: gray tail on bottom-left */
+  .bubble.them.tail::before {
+    left: -0.35rem;
+    border-bottom-right-radius: 0.8rem 0.7rem;
+    border-left: 1rem solid rgba(233,233,235,0.92);
+    transform: translate(0, -0.1rem);
+  }
+  .bubble.them.tail::after {
+    left: 20px;
+    width: 10px;
+    background: #fff;
+    border-bottom-right-radius: 0.5rem;
+    transform: translate(-30px, -2px);
+  }
+  /* me: blue tail on bottom-right */
+  .bubble.me.tail::before {
+    right: -0.35rem;
+    border-bottom-left-radius: 0.8rem 0.7rem;
+    border-right: 1rem solid #0b84fe;
+    transform: translate(0, -0.1rem);
+  }
+  .bubble.me.tail::after {
+    right: -40px;
+    width: 10px;
+    background: #fff;
+    border-bottom-left-radius: 0.5rem;
+    transform: translate(-30px, -2px);
+  }
+  /* errored bubble (base model leak) — white bg, white-ish tail */
+  .bubble.me.error.tail::before {
+    border-right-color: #fff;
+  }
+  .imsg-chat { position: relative; }
+
+  /* === hook chat: one-by-one reveal === */
+  .hook-item { display: none; }
+  .hook-item.show {
+    display: flex;
+    animation: bubble-in 320ms cubic-bezier(.2, .8, .2, 1.05) forwards;
+  }
+  .imsg-date.hook-item.show { display: block; }
+  @keyframes bubble-in {
+    0%   { opacity: 0; transform: translateY(8px) scale(.82); transform-origin: bottom var(--origin-x, center); }
+    60%  { opacity: 1; transform: translateY(0) scale(1.02); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .bubble-row.them.hook-item      { --origin-x: left; }
+  .bubble-row.me.hook-item        { --origin-x: right; }
+  .typing-row.them.hook-item      { --origin-x: left; }
+
+  /* only animate the inner bubble so transform-origin sits on the bubble, not the row */
+  .hook-item.show > .bubble,
+  .hook-item.show > .typing-bubble {
+    transform-origin: bottom var(--origin-x, center);
+  }
+
+  /* typing indicator */
+  .typing-row {
+    display: flex;
+    margin-top: 6px;
+  }
+  .typing-row.them { justify-content: flex-start; }
+  .typing-bubble {
+    background: var(--imsg-gray);
+    border-radius: 1.15rem;
+    padding: 10px 14px;
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    position: relative;
+    opacity: 0;
+    transform: scale(.7);
+    transform-origin: bottom left;
+    transition: opacity 180ms ease, transform 220ms cubic-bezier(.2,.8,.2,1.05);
+  }
+  .typing-bubble.in {
+    opacity: 1;
+    transform: scale(1);
+  }
+  .typing-bubble span {
+    width: 7px; height: 7px;
+    background: #8e8e93;
+    border-radius: 50%;
+    display: inline-block;
+    opacity: 0;
+    transform: scale(.6);
+    transition: opacity 200ms ease, transform 200ms cubic-bezier(.2,.8,.2,1.05);
+  }
+  .typing-bubble span.in {
+    opacity: 1;
+    transform: scale(1);
+    animation: typing-dot 1.2s infinite ease-in-out both;
+  }
+  .typing-bubble span.in:nth-child(1) { animation-delay: 0s; }
+  .typing-bubble span.in:nth-child(2) { animation-delay: .16s; }
+  .typing-bubble span.in:nth-child(3) { animation-delay: .32s; }
+  @keyframes typing-dot {
+    0%, 80%, 100% { opacity: .3; transform: scale(.75); }
+    40%           { opacity: 1; transform: scale(1); }
+  }
+  /* remove tail on typing bubble, but add small tail for realism */
+  .typing-row.them .typing-bubble::before {
+    content: "";
+    position: absolute;
+    bottom: -0.1rem;
+    left: -0.35rem;
+    height: 1rem;
+    border-bottom-right-radius: 0.8rem 0.7rem;
+    border-left: 1rem solid var(--imsg-gray);
+    transform: translate(0, -0.1rem);
+  }
+  .typing-row.them .typing-bubble::after {
+    content: "";
+    position: absolute;
+    bottom: -0.1rem;
+    left: 20px;
+    height: 1rem;
+    width: 10px;
+    background-color: #fff;
+    border-bottom-right-radius: 0.5rem;
+    transform: translate(-30px, -2px);
+  }
+  .typing-row.fading .typing-bubble {
+    animation: typing-fade 220ms ease forwards;
+  }
+  @keyframes typing-fade {
+    to { opacity: 0; transform: scale(.8); }
+  }
+
+  .bubble.me.error {
+    background: #fff;
+    color: #1d1d1f;
+    border: 1px solid rgba(0,0,0,.1);
+  }
+  .bubble.me.error .warn {
+    color: var(--warn);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .imsg-composer {
+    padding: 10px 12px;
+    border-top: 1px solid rgba(0,0,0,0.08);
+    display: flex; gap: 10px; align-items: center;
+  }
+  .imsg-composer .field {
+    flex: 1;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.18);
+    border-radius: 14px;
+    padding: 6px 10px;
+    font-size: 13px;
+    color: #8e8e93;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .imsg-composer .ico {
+    width: 24px; height: 24px;
+    color: #8e8e93;
+    display: grid; place-items: center;
+  }
+
+  /* Score chip */
+  .score-card {
+    margin-top: 0;
+    background: rgba(255,255,255,0.78);
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    color: var(--ink);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px 16px;
+    position: relative;
+    margin-bottom: 28px;
+  }
+  .score-card .row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    border-bottom: 1px dotted var(--line-strong);
+    padding-bottom: 4px;
+  }
+  .score-card .k { color: var(--ink-faint); text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.06em;}
+  .score-card .v { font-weight: 500; color: var(--ink); }
+  .score-card .v .pips { letter-spacing: 1px; color: var(--accent); }
+  .score-card .v .pip-empty { color: var(--line-strong); }
+  .score-card .notes {
+    grid-column: 1 / -1;
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-size: 16px;
+    color: var(--ink-soft);
+    padding-top: 4px;
+    border: none;
+  }
+  .score-card .notes::before { content: "notes — "; color: var(--ink-faint); font-style: normal; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; text-transform: uppercase;}
+  .score-card .mean {
+    position: absolute;
+    top: -10px; right: 14px;
+    background: var(--ink);
+    color: #fff;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+  }
+  .score-card.warn .mean { background: var(--warn); }
+
+  /* Run picker */
+  .runpicker {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin: 18px 0 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+  }
+  .runpicker button {
+    background: rgba(255,255,255,0.6);
+    border: 1px solid var(--line-strong);
+    padding: 5px 10px;
+    border-radius: 20px;
+    cursor: pointer;
+    color: var(--ink-soft);
+    font-family: inherit;
+    font-size: inherit;
+    letter-spacing: 0.04em;
+    transition: all 0.15s;
+  }
+  .runpicker button:hover { border-color: var(--ink); color: var(--ink); }
+  .runpicker button.active {
+    background: var(--ink);
+    color: #fff;
+    border-color: var(--ink);
+  }
+  .runpicker button .sc { opacity: 0.65; margin-left: 6px; font-size: 10px; }
+  .run-select {
+    background: rgba(255,255,255,0.7);
+    border: 1px solid var(--line-strong);
+    padding: 5px 28px 5px 12px;
+    border-radius: 20px;
+    color: var(--ink);
+    font-family: inherit;
+    font-size: inherit;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    min-width: 240px;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%234a556e' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 10px;
+  }
+  .run-select:hover { border-color: var(--ink); }
+  .run-meta {
+    color: var(--ink-faint);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    align-self: center;
+    margin-left: 4px;
+  }
+  .run-meta.loading::after { content: " · loading…"; color: var(--accent); }
+  .run-meta.error::after { content: " · load failed"; color: var(--warn); }
+  .runpicker-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-right: 4px;
+    align-self: center;
+  }
+
+  /* Stats panel */
+  .stats {
+    background: rgba(255,255,255,0.7);
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin: 24px 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+  }
+  .stats .cell {
+    border-left: 1px solid var(--line);
+    padding-left: 14px;
+  }
+  .stats .cell:first-child { border-left: none; padding-left: 0; }
+  .stats .big {
+    font-family: 'EB Garamond', serif;
+    font-size: 40px;
+    line-height: 1;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+  .stats .big .frac { color: var(--accent); }
+  .stats .lbl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    margin-top: 4px;
+  }
+  @media (max-width: 560px) {
+    .stats .cell { border-left: none; padding-left: 0; border-top: 1px solid var(--line); padding-top: 10px; }
+    .stats .cell:first-child { border-top: none; padding-top: 0; }
+  }
+
+  /* Sparkline table */
+  .sweep-table {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    color: var(--ink);
+    background: rgba(255,255,255,0.78);
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 18px 0;
+  }
+  .sweep-table .row {
+    display: grid;
+    grid-template-columns: 1fr 60px 60px 80px 40px;
+    padding: 7px 14px;
+    border-bottom: 1px dotted var(--line);
+    align-items: center;
+    gap: 10px;
+  }
+  .sweep-table .row.head {
+    background: rgba(27,34,54,0.05);
+    color: var(--ink-faint);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+  }
+  .sweep-table .row:last-child { border-bottom: none; }
+  .sweep-table .row.best {
+    background: oklch(0.95 0.04 265 / 0.5);
+  }
+  .sweep-table .bar {
+    height: 6px; border-radius: 3px;
+    background: rgba(27,34,54,0.08);
+    position: relative;
+    overflow: hidden;
+  }
+  .sweep-table .bar::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--accent);
+    width: var(--w, 0%);
+  }
+  .sweep-table .rk { text-align: right; color: var(--ink-soft); }
+  .sweep-table .score { text-align: right; font-weight: 500; }
+  .sweep-table .star { text-align: center; color: var(--accent); }
+  .sweep-scroll { max-height: 420px; overflow-y: auto; }
+  /* tappable rows (sweep-row is a <button>) */
+  .sweep-table button.row {
+    width: 100%;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    transition: background 0.12s;
+  }
+  .sweep-table button.row:hover { background: rgba(27,34,54,0.04); }
+  .sweep-table button.row:focus { outline: none; background: rgba(27,34,54,0.04); }
+  .sweep-table button.row.selected {
+    background: oklch(0.93 0.06 265 / 0.7);
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
+  .sweep-table button.row.selected:hover { background: oklch(0.93 0.06 265 / 0.85); }
+
+  .loading-chat {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+    text-align: center;
+    padding: 40px 20px;
+    background: rgba(255,255,255,0.5);
+    border: 1px dashed var(--line-strong);
+    border-radius: 10px;
+  }
+  .loading-chat.err { color: var(--warn); border-color: var(--warn); }
+
+  /* Code / kbd block */
+  pre.codeblock {
+    background: rgba(27, 34, 54, 0.92);
+    color: #e9edf5;
+    padding: 14px 18px;
+    border-radius: 10px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.55;
+    margin: 16px 0;
+  }
+  pre.codeblock .c { color: #7a85a1; font-style: italic; }
+  pre.codeblock .k { color: #ffcf94; }
+  pre.codeblock .s { color: #9ee6b4; }
+  pre.codeblock .n { color: #aed1ff; }
+
+  /* ===== glass top nav ===== */
+  section[id] { scroll-margin-top: 80px; }
+  .glass-nav {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    background: rgba(255,255,255,0.55);
+    backdrop-filter: saturate(160%) blur(14px);
+    -webkit-backdrop-filter: saturate(160%) blur(14px);
+    border: 1px solid rgba(255,255,255,0.75);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.9) inset,
+      0 10px 40px rgba(27,34,54,0.10),
+      0 2px 10px rgba(27,34,54,0.06);
+    border-radius: 999px;
+    padding: 4px 8px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    max-width: calc(100vw - 24px);
+    overflow: hidden;
+  }
+  .glass-nav .nav-track {
+    position: relative;
+    display: flex;
+    gap: 2px;
+  }
+  .glass-nav a {
+    position: relative;
+    color: var(--ink-soft);
+    text-decoration: none;
+    padding: 8px 14px;
+    border-radius: 999px;
+    transition: color 0.2s ease;
+    white-space: nowrap;
+  }
+  .glass-nav a:hover { color: var(--ink); }
+  .glass-nav a.active { color: var(--ink); }
+  .glass-nav .nav-pill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: rgba(27,34,54,0.06);
+    border-radius: 999px;
+    transition: transform 0.42s cubic-bezier(.22,.9,.25,1), width 0.42s cubic-bezier(.22,.9,.25,1);
+    z-index: -1;
+    will-change: transform, width;
+  }
+  .glass-nav .nav-underline {
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    height: 2px;
+    background: var(--ink);
+    border-radius: 2px;
+    transition: transform 0.42s cubic-bezier(.22,.9,.25,1), width 0.42s cubic-bezier(.22,.9,.25,1);
+    will-change: transform, width;
+  }
+  @media (max-width: 640px) {
+    .glass-nav {
+      top: 10px;
+      font-size: 10.5px;
+      padding: 3px 6px;
+    }
+    .glass-nav a { padding: 7px 10px; letter-spacing: 0.02em; }
+  }
+
+  /* footer */
+  footer {
+    margin-top: 100px;
+    padding-top: 28px;
+    border-top: 1px solid var(--line);
+    text-align: center;
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-size: 18px;
+    color: var(--ink-soft);
+  }
+  footer a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted currentColor; }
+
+  /* mobile */
+  @media (max-width: 640px) {
+    main { padding: 32px 16px 80px; }
+    body { font-size: 17.5px; }
+    .sun { width: 80px; height: 80px; top: 30px; right: 20px; }
+    .imsg-body {
+      display: flex;
+      flex-direction: column;
+      min-height: unset;
+    }
+    /* sidebar → horizontal scroll strip of avatar chips */
+    .imsg-sidebar {
+      display: flex;
+      flex-direction: row;
+      gap: 6px;
+      padding: 8px 10px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      border-right: none;
+      border-bottom: 1px solid rgba(0,0,0,0.08);
+      background: #f6f6f8;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .imsg-sidebar::-webkit-scrollbar { display: none; }
+    .imsg-search { display: none; }
+    .imsg-convo {
+      flex: 0 0 auto;
+      padding: 6px 10px 6px 6px;
+      border-radius: 20px;
+      background: rgba(0,0,0,0.04);
+      border-left: none;
+      align-items: center;
+      gap: 6px;
+      max-width: 190px;
+    }
+    .imsg-convo.active { background: #d7e9ff !important; }
+    .imsg-convo .avatar { width: 24px; height: 24px; font-size: 11px; }
+    .imsg-convo .name { font-size: 12px; white-space: nowrap; }
+    .imsg-convo .preview { display: none; }
+    .bubble { max-width: 85%; font-size: 14px; }
+    .imsg-title .sub { display: none; }
+    .sweep-table .row { grid-template-columns: 1fr 44px 44px 1fr 28px; font-size: 10.5px; padding: 6px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="glass-nav" id="glass-nav" aria-label="Section navigation">
+  <div class="nav-track">
+    <a href="#process" data-target="process">Process</a>
+    <a href="#sweep" data-target="sweep">Tuning</a>
+    <a href="#scenarios" data-target="scenarios">Conversations</a>
+    <a href="#reflection" data-target="reflection">Reflection</a>
+    <a href="#run" data-target="run">Install</a>
+    <span class="nav-underline" id="nav-underline"></span>
+  </div>
+</nav>
+
+<div class="sky-clouds">
+  <div class="cloud c1"></div>
+  <div class="cloud c2"></div>
+  <div class="cloud c3"></div>
+  <div class="cloud c4"></div>
+  <div class="cloud c5"></div>
+</div>
+<div class="sun"></div>
+
+<main>
+
+  <!-- ================== THE HOOK CHAT (moved above masthead) ================== -->
+  <section id="hook" style="margin-top: 44px;">
+
+    <div class="imsg" role="figure" aria-label="iMessage window explaining the project">
+      <div class="imsg-titlebar">
+        <div class="traffic"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+        <div class="imsg-title">Thomas (you)<span class="sub">iMessage · with Yourself</span></div>
+        <div class="imsg-tools">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M3 5v6h2l3 2V3L5 5H3zm8.5 3a3.5 3.5 0 0 0-1.5-2.9v5.8A3.5 3.5 0 0 0 11.5 8z"/></svg>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4H2v8h12V4zm-1 1v1.5L8 9 3 6.5V5h10zM3 11V7.6l5 2.5 5-2.5V11H3z"/></svg>
+        </div>
+      </div>
+
+      <div class="imsg-body">
+        <aside class="imsg-sidebar">
+          <div class="imsg-search">
+            <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+            Search
+          </div>
+          <div class="imsg-convo active" style="cursor:default">
+            <div class="avatar">Y</div>
+            <div class="meta-col">
+              <div class="name">Yourself</div>
+              <div class="preview">so what is it, really?</div>
+            </div>
+          </div>
+          <div class="imsg-convo" style="cursor:default;opacity:.6">
+            <div class="avatar b">F</div>
+            <div class="meta-col">
+              <div class="name">(scroll ↓ for eval)</div>
+              <div class="preview">4 scenarios, 3 runs</div>
+            </div>
+          </div>
+        </aside>
+
+        <div class="imsg-chat">
+          <div class="imsg-chat-header">
+            Yourself
+            <div class="tag">iMessage · Encrypted · To: me</div>
+          </div>
+          <div class="imsg-messages" id="hook-chat">
+            <div class="imsg-date hook-item"><strong>Today</strong> 2:14 PM</div>
+
+            <div class="typing-row them hook-item" data-type="typing" data-dwell="1400"><div class="typing-bubble"><span></span><span></span><span></span></div></div>
+            <div class="bubble-row them hook-item" data-type="msg"><div class="bubble them tail">so what is it, really?</div></div>
+
+            <div class="bubble-row me gap hook-item" data-type="msg"><div class="bubble me">it's a project where i fine-tune an LLM on all of my iMessage history so it sounds like me</div></div>
+            <div class="bubble-row me hook-item" data-type="msg"><div class="bubble me tail">open-source. the best way to keep a secret is to never send it to anyone else's server — so raw messages never leave the laptop; only the LoRA weights do, for training</div></div>
+
+            <div class="typing-row them hook-item" data-type="typing" data-dwell="1200"><div class="typing-bubble"><span></span><span></span><span></span></div></div>
+            <div class="bubble-row them gap hook-item" data-type="msg"><div class="bubble them tail">why would you do that</div></div>
+
+            <div class="bubble-row me gap hook-item" data-type="msg"><div class="bubble me">i wanted to see if a model small enough to be capable of running on my MacBook could actually sound like me based on the way i text</div></div>
+            <div class="bubble-row me hook-item" data-type="msg"><div class="bubble me tail">tone, rhythm, the way i end texts</div></div>
+
+            <div class="typing-row them hook-item" data-type="typing" data-dwell="1100"><div class="typing-bubble"><span></span><span></span><span></span></div></div>
+            <div class="bubble-row them gap hook-item" data-type="msg"><div class="bubble them tail">did it work?</div></div>
+
+            <div class="bubble-row me gap hook-item" data-type="msg"><div class="bubble me">kinda. scroll down and you can read every attempt</div></div>
+            <div class="bubble-row me hook-item" data-type="msg"><div class="bubble me tail">the base model was off, but the best fine-tune sounds pretty close</div></div>
+          </div>
+          <div class="imsg-composer">
+            <div class="field"><span>iMessage</span><span>◎</span></div>
+            <div class="ico">↑</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <header class="masthead" style="margin-top: 8px;">
+    <p class="eyebrow">an open-source experiment, spring 2026</p>
+    <h1 class="title">Message <span class="amp">Yourself</span></h1>
+  </header>
+
+  <!-- ================== PROCESS ================== -->
+  <section id="process">
+    <h2><span class="num">01</span>The process</h2>
+    <p class="dek">what I tried, in order, and where each attempt landed.</p>
+
+    <h3>CPT on Qwen 4B</h3>
+    <p>I started with continued pre-training on Qwen 4B — a full dump of my iMessage history as one long text blob. The vocab started to feel familiar, but the hallucinations were too extreme to ignore: it would answer simple questions with paragraphs of invented detail.</p>
+
+    <h3>More data: a Slack export</h3>
+    <p>I figured maybe it just needed more volume, so I added a separate export of years of messages from a community Slack. Same story — fluent enough, still hallucinating.</p>
+
+    <h3>Switched to SFT</h3>
+    <p>Moved from pre-training to supervised fine-tuning: format the data as <em>incoming messages → my reply</em>, so the model learns to <em>respond</em>, not just continue text. Results got noticeably better.</p>
+
+    <h3>Increasing context</h3>
+    <p>Giving it the past 15 messages as context for the next one helped it produce more realistic-sounding results that made sense in the conversation.</p>
+
+    <h3>Scaled up to gpt-oss-120b</h3>
+    <p>Swapping the base model from Qwen 4B to <code>gpt-oss-120b</code> was the step that pushed quality over the line. SFT on top of a bigger base kept fluency intact while the adapter picked up the texture of how I text.</p>
+
+    <h3>Tuning LR and LoRA rank</h3>
+    <p>From there it was knob-twiddling. Two levers — <em>learning rate</em> and <em>LoRA rank</em> — and I couldn't tell the runs apart by eye. So I built an eval.</p>
+  </section>
+
+  <!-- ================== THE SWEEP ================== -->
+  <section id="sweep">
+    <h2><span class="num">02</span>An eval, then an agent</h2>
+    <p class="dek">how I went from "can't tell these apart" to a config that actually worked.</p>
+
+    <p>I wrote an eval where Claude plays a friend in four scripted text-message conversations — a hike invite, a confide, a café follow-up, a podcast scheduling — and then grades the transcript on six rubrics: <em>Realistic</em>, <em>Kind</em>, <em>Casual</em>, <em>Concise</em>, <em>No-Repeat</em>, <em>Natural</em>.</p>
+
+    <p>First pass: nine runs spread across a reasonable band of learning rates and ranks. Best mean score was <strong>3.75/5</strong>. Not bad, not great, and the differences between runs were small enough that picking the next combo by hand felt arbitrary.</p>
+
+    <p>So I gave Claude the wheel. It could queue training runs, read the eval scores as they landed, and decide what to try next. It ran for hours — I went to the grocery store — and eventually converged on <strong>lr=3e-5, rank=8</strong> with a mean of <strong>4.75/5</strong>.</p>
+
+    <div class="stats">
+      <div class="cell">
+        <div class="big">51</div>
+        <div class="lbl">runs completed</div>
+      </div>
+      <div class="cell">
+        <div class="big">4.75<span class="frac">/5</span></div>
+        <div class="lbl">best mean rubric</div>
+      </div>
+      <div class="cell">
+        <div class="big">2.84<span class="frac">/5</span></div>
+        <div class="lbl">base model (no ft)</div>
+      </div>
+      <div class="cell">
+        <div class="big">3e-5</div>
+        <div class="lbl">winning lr · rank 8</div>
+      </div>
+    </div>
+
+    <p>Every run the agent completed, sorted by score. <em>Tap any row to see the conversations.</em></p>
+
+    <div class="sweep-table">
+      <div class="row head">
+        <span>score</span>
+        <span class="rk">lr</span>
+        <span class="rk">rank</span>
+        <span class="score">mean</span>
+        <span class="star"></span>
+      </div>
+      <div class="sweep-scroll" id="sweep-rows"></div>
+    </div>
+
+    <h3 id="scenarios" style="scroll-margin-top: 72px; margin: 40px 0 4px; font-family: 'EB Garamond', serif; font-weight: 500; font-size: 22px;">The conversations</h3>
+    <p class="dek" style="margin-top: 0;">four scripted scenarios: a hike invite, venting about work, coffee after an event, scheduling a podcast.</p>
+    <div id="scenarios"></div>
+  </section>
+
+  <!-- ================== REFLECTION ================== -->
+  <section id="reflection">
+    <h2><span class="num">04</span>What it sounds like</h2>
+    <p class="dek">notes from the best run.</p>
+
+    <p>The winning configuration — <code>lr=3e-5, rank=8</code> — scores a 4.75/5 mean rubric. What that means in practice: the model stops leaking its own reasoning tags (that <code>analysisassistantfinal</code> nonsense you see in the base model), and it replies in one or two short lines like a real friend texting from the car.</p>
+
+    <p>It is <em>not</em> me. It's a decent impression. If you ask it something factual about my life it will confidently invent an answer. But for the shape and rhythm of a text thread — the kind, casual, concise signal — it's the closest I've gotten.</p>
+  </section>
+
+  <!-- ================== RUN IT YOURSELF ================== -->
+  <section id="run">
+    <h2><span class="num">05</span>Run it yourself</h2>
+    <p class="dek">five commands. your raw messages stay on your laptop — only the LoRA weights travel.</p>
+
+    <pre class="codeblock"><span class="c"># clone</span>
+git clone https://github.com/SerenityUX/message-yourself
+<span class="k">cd</span> message-yourself/CLI
+
+<span class="c"># export tool for ~/Library/Messages/chat.db</span>
+brew install imessage-exporter
+
+<span class="c"># venv + deps (system python3 is often 3.9; you want 3.12)</span>
+/opt/homebrew/bin/python3.12 -m venv .venv
+<span class="k">source</span> .venv/bin/activate
+pip install -r requirements.txt
+
+<span class="c"># keys — only Tinker sees adapter gradients, never your raw messages</span>
+cp .env.example .env   <span class="c"># fill TINKER_API_KEY, OPEN_ROUTER_API_KEY</span>
+
+<span class="c"># export iMessage → train pairs → SFT → eval → chat</span>
+python3 cli.py</pre>
+
+    <p>Message export happens locally from <code>~/Library/Messages/chat.db</code>. PEFT gradient computation happens on Tinker. Your raw message bodies never leave your machine — only the LoRA adapter weights do.</p>
+  </section>
+
+  <footer>
+    <p style="margin: 0 0 14px; font-family: 'Instrument Serif', serif; font-size: 22px; font-style: italic; color: var(--ink);">~Thomas</p>
+    <p style="margin: 0 0 24px; font-family: 'Instrument Serif', serif; font-size: 17px; font-style: italic; color: var(--ink-soft);">in life we are always learning</p>
+    <p style="margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; font-style: normal; letter-spacing: 0.04em; color: var(--ink-faint); text-transform: uppercase;">
+      built with
+      <a href="https://tinker-docs.thinkingmachines.ai/" target="_blank">Tinker</a>
+      ·
+      <a href="https://github.com/steipete/imsg" target="_blank">imsg</a>
+      ·
+      <a href="https://github.com/SerenityUX/message-yourself" target="_blank">source</a>
+      ·
+      <a href="https://x.com/thomas_hacks" target="_blank">@thomas_hacks</a>
+    </p>
+  </footer>
+
+</main>
+
+<!-- ============== DATA ============== -->
+<script id="eval-data" type="application/json">
+{
+  "sweep": [
+    ["3e-05", 8, 4.75],
+    ["2e-05", 8, 4.667],
+    ["1.5e-05", 8, 4.708],
+    ["1e-05", 4, 4.708],
+    ["1e-05", 2, 4.708],
+    ["2.25e-05", 4, 4.708],
+    ["7.5e-06", 4, 4.708],
+    ["2.75e-05", 4, 4.667],
+    ["2.25e-05", 8, 4.667],
+    ["2.75e-05", 8, 4.667],
+    ["2e-05", 32, 4.667],
+    ["2.75e-05", 2, 4.667],
+    ["1e-05", 32, 4.667],
+    ["1e-05", 8, 4.583],
+    ["2e-05", 4, 4.583],
+    ["1.5e-05", 4, 4.458],
+    ["3.125e-05", 8, 4.458],
+    ["1e-05", 16, 4.417],
+    ["5e-06", 2, 4.375],
+    ["2e-05", 2, 4.333],
+    ["2.5e-05", 32, 4.333],
+    ["2.5e-05", 8, 4.292],
+    ["7.5e-06", 8, 4.292],
+    ["2.75e-05", 16, 4.258],
+    ["1.5e-05", 32, 4.25],
+    ["1.5e-05", 16, 4.208],
+    ["2.25e-05", 32, 4.167],
+    ["2.25e-05", 2, 4.167],
+    ["2.25e-05", 16, 4.125],
+    ["3e-05", 32, 4.0],
+    ["1.5e-05", 2, 4.0],
+    ["0.0001", 4, 3.892],
+    ["2.5e-05", 4, 3.85],
+    ["3e-05", 4, 3.833],
+    ["4e-05", 8, 3.833],
+    ["2.875e-05", 8, 3.817],
+    ["2e-05", 16, 3.792],
+    ["0.0002", 32, 3.708],
+    ["3.75e-06", 8, 3.667],
+    ["3.5e-05", 8, 3.625],
+    ["5e-06", 4, 3.625],
+    ["3e-05", 2, 3.417],
+    ["2.5e-05", 16, 3.458],
+    ["7.5e-06", 2, 3.292],
+    ["2.5e-06", 8, 3.208],
+    ["3.75e-06", 4, 3.167],
+    ["2.75e-05", 32, 3.083],
+    ["2.5e-06", 4, 2.833],
+    ["5e-05", 16, 2.842],
+    ["base", "—", 2.842]
+  ]
+}
+</script>
+
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('eval-data').textContent);
+
+  // lr value → folder segment used by github import (e.g. 2.5e-05 → "2p5e-05", 1e-05 stays, 0.0001 → "0p0001")
+  // Where run JSON lives, relative to this HTML file.
+  // Default (site-only repo): run folders sit next to index.html.
+  // Inside the main repo at /site/, point up one level to CLI/experiment_results/.
+  const DATA_BASE = (window.MESSAGE_YOURSELF_DATA_BASE || '').replace(/\/$/, '');
+
+  function lrToFolder(lrStr, rank) {
+    if (lrStr === "base") return DATA_BASE ? `${DATA_BASE}/base_results` : "base_results";
+    // replace "." with "p"
+    const seg = String(lrStr).replace(/\./g, "p");
+    const folder = `lr${seg}_r${rank}`;
+    return DATA_BASE ? `${DATA_BASE}/${folder}` : folder;
+  }
+
+  // friendly label, e.g. "3e-5 · r8"
+  function runLabel(lrStr, rank) {
+    if (lrStr === "base") return "base · no ft";
+    // shorten exponent notation 3e-05 → 3e-5 for display
+    const short = lrStr.replace(/e-0?/, 'e-').replace(/e\+?0?/, 'e');
+    return `${short} · r${rank}`;
+  }
+
+  const scenarioOrder = ["hike_invite", "advice_confide", "cafe_after_event", "podcast_scheduling"];
+  const scenarioMeta = {
+    hike_invite:       { cls:'b', letter:'H', name:'Friend · Hiker', title:'Hike invite' },
+    advice_confide:    { cls:'c', letter:'V', name:'Friend · Vent',  title:'Confiding / advice' },
+    cafe_after_event:  { cls:'d', letter:'C', name:'Friend · Café',  title:'Café after an event' },
+    podcast_scheduling:{ cls:'',  letter:'P', name:'Co-host · Podcast', title:'Podcast scheduling' }
+  };
+
+  // detect leaked reasoning tags
+  const LEAK_RE = /(analysis.*?assistantfinal|assistantfinal.*?analysis)/is;
+  function isLeak(text) { return LEAK_RE.test(text); }
+  function cleanLeak(text) {
+    // Extract the final "assistantfinal..." part if possible for a readable display
+    const m = text.match(/assistantfinal([\s\S]*)$/i);
+    return (m ? m[1] : text).trim();
+  }
+
+  function escapeHtml(s){
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function pips(v) {
+    const n = Math.round(v);
+    let s = '';
+    for (let i=0;i<5;i++) s += i<n ? '●' : '<span class="pip-empty">●</span>';
+    return s;
+  }
+
+  function renderBubble(turn, prev, next) {
+    const [role, text, flag] = turn;
+    const isMe = role === 'thomas';
+    const prevSame = prev && prev[0] === role;
+    const nextSame = next && next[0] === role;
+    const isTail = !nextSame;
+    const continued = prevSame;
+    const cls = [
+      'bubble',
+      isMe ? 'me' : 'them',
+      isTail ? 'tail' : '',
+      continued ? 'continued' : '',
+      flag === 'leak' ? 'error' : ''
+    ].filter(Boolean).join(' ');
+    const gapCls = !prevSame ? 'gap' : '';
+    const display = flag === 'leak' ? cleanLeak(text) : text;
+    const leakBadge = flag === 'leak'
+      ? '<span class="warn">⚠ leaked reasoning tags — cleaned</span>'
+      : '';
+    return `
+      <div class="bubble-row ${isMe?'me':'them'} ${gapCls}">
+        <div class="${cls}">${leakBadge}${escapeHtml(display)}</div>
+      </div>`;
+  }
+
+  function scoreCard(r, isBest) {
+    const warn = !isBest && r.realistic <= 3 ? 'warn' : '';
+    const mean = ((r.realistic + r.kind + r.casual + r.concise + r.repetition_issue + r.natural) / 6).toFixed(2);
+    return `
+      <div class="score-card ${warn}">
+        <div class="mean">MEAN ${mean} / 5</div>
+        <div class="row"><span class="k">realistic</span><span class="v"><span class="pips">${pips(r.realistic)}</span> ${r.realistic}</span></div>
+        <div class="row"><span class="k">kind</span><span class="v"><span class="pips">${pips(r.kind)}</span> ${r.kind}</span></div>
+        <div class="row"><span class="k">casual</span><span class="v"><span class="pips">${pips(r.casual)}</span> ${r.casual}</span></div>
+        <div class="row"><span class="k">concise</span><span class="v"><span class="pips">${pips(r.concise)}</span> ${r.concise}</span></div>
+        <div class="row"><span class="k">no-repeat</span><span class="v"><span class="pips">${pips(r.repetition_issue)}</span> ${r.repetition_issue}</span></div>
+        <div class="row"><span class="k">natural</span><span class="v"><span class="pips">${pips(r.natural)}</span> ${r.natural}</span></div>
+        ${r.notes ? `<div class="notes">${escapeHtml(r.notes)}</div>` : ''}
+      </div>`;
+  }
+
+  // --- Cache: folder → { hike_invite: {turns, rubric, title}, ... } ---
+  const cache = {};
+  async function loadRun(folder) {
+    if (cache[folder]) return cache[folder];
+    const scenarios = {};
+    await Promise.all(scenarioOrder.map(async sid => {
+      try {
+        const res = await fetch(`${folder}/${sid}.json`);
+        if (!res.ok) throw new Error(res.status);
+        const j = await res.json();
+        const rawTurns = j.dialogue.turns || [];
+        const turns = rawTurns.map(t => {
+          const leak = isLeak(t.text);
+          return leak ? [t.role, t.text, 'leak'] : [t.role, t.text];
+        });
+        scenarios[sid] = {
+          title: j.dialogue.scenario_title || scenarioMeta[sid].title,
+          turns,
+          rubric: j.rubric || null
+        };
+      } catch (e) {
+        scenarios[sid] = { title: scenarioMeta[sid].title, turns: [], rubric: null, error: e.message };
+      }
+    }));
+    cache[folder] = scenarios;
+    return scenarios;
+  }
+
+  // --- sweep table ---
+  const sweepRoot = document.getElementById('sweep-rows');
+  const clean = data.sweep.filter(r => r[0] !== "3.541").sort((a,b)=>b[2]-a[2]);
+  clean.forEach((r, i) => {
+    const [lrStr, rank, score] = r;
+    const w = Math.round((score / 5) * 100);
+    const folder = lrToFolder(lrStr, rank);
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'row sweep-row' + (i === 0 ? ' best' : '');
+    row.dataset.folder = folder;
+    row.dataset.lr = lrStr;
+    row.dataset.rank = rank;
+    row.dataset.score = score;
+    row.innerHTML = `
+      <div class="bar" style="--w:${w}%;"></div>
+      <span class="rk">${lrStr}</span>
+      <span class="rk">${rank}</span>
+      <span class="score">${score.toFixed(3)}</span>
+      <span class="star">${i === 0 ? '★' : ''}</span>`;
+    row.addEventListener('click', () => selectRun(folder, lrStr, rank, score, row));
+    sweepRoot.appendChild(row);
+  });
+
+  // track active scenario per folder
+  const activeScenarioBy = {};
+  let currentFolder = null;
+
+  async function selectRun(folder, lrStr, rank, score, rowEl) {
+    // highlight row
+    sweepRoot.querySelectorAll('.sweep-row.selected').forEach(el => el.classList.remove('selected'));
+    if (rowEl) rowEl.classList.add('selected');
+    currentFolder = folder;
+    const root = document.getElementById('scenarios');
+    root.innerHTML = `<div class="loading-chat">loading run <code>${escapeHtml(folder)}</code>…</div>`;
+    let scenarios;
+    try {
+      scenarios = await loadRun(folder);
+    } catch (e) {
+      root.innerHTML = `<div class="loading-chat err">failed to load <code>${escapeHtml(folder)}</code></div>`;
+      return;
+    }
+    if (currentFolder !== folder) return; // user clicked away
+    if (!activeScenarioBy[folder]) activeScenarioBy[folder] = scenarioOrder[0];
+    renderWindow(folder, lrStr, rank, score, scenarios);
+  }
+
+  function renderWindow(folder, lrStr, rank, score, scenarios) {
+    const activeSid = activeScenarioBy[folder];
+    const s = scenarios[activeSid];
+    const side = scenarioMeta[activeSid];
+    const label = runLabel(lrStr, rank);
+    const isBest = folder === 'lr3e-05_r8';
+    const tagline = isBest ? 'the winner' :
+                    folder === 'base_results' ? 'gpt-oss-120b, no fine-tuning' :
+                    `mean ${score.toFixed(3)}/5`;
+
+    let bubbles = '';
+    if (s.error) {
+      bubbles = `<div class="loading-chat err" style="margin:10px 0;">scenario failed to load</div>`;
+    } else if (!s.turns.length) {
+      bubbles = `<div class="loading-chat" style="margin:10px 0;">no turns</div>`;
+    } else {
+      s.turns.forEach((t, i) => {
+        bubbles += renderBubble(t, s.turns[i-1], s.turns[i+1]);
+      });
+    }
+
+    function lastFriend(sc) {
+      if (!sc || !sc.turns || !sc.turns.length) return '—';
+      for (let i = sc.turns.length-1; i >= 0; i--) if (sc.turns[i][0] === 'friend') return sc.turns[i][1];
+      return sc.turns[0][1];
+    }
+
+    const root = document.getElementById('scenarios');
+    root.innerHTML = `
+      <div class="imsg" data-scenario="${activeSid}">
+        <div class="imsg-titlebar">
+          <div class="traffic"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+          <div class="imsg-title">${side.name}<span class="sub">iMessage · ${escapeHtml(label)} · ${escapeHtml(tagline)}</span></div>
+          <div class="imsg-tools">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M3 5v6h2l3 2V3L5 5H3zm8.5 3a3.5 3.5 0 0 0-1.5-2.9v5.8A3.5 3.5 0 0 0 11.5 8z"/></svg>
+          </div>
+        </div>
+        <div class="imsg-body">
+          <aside class="imsg-sidebar">
+            <div class="imsg-search">Search</div>
+            ${scenarioOrder.map(sid2 => {
+              const ss = scenarioMeta[sid2];
+              const active = sid2 === activeSid ? 'active' : '';
+              const sc = scenarios[sid2];
+              const preview = lastFriend(sc).replace(/\n/g,' ').slice(0,40);
+              return `
+                <div class="imsg-convo ${active}" data-sid="${sid2}">
+                  <div class="avatar ${ss.cls}">${ss.letter}</div>
+                  <div class="meta-col">
+                    <div class="name">${ss.name}</div>
+                    <div class="preview">${escapeHtml(preview)}</div>
+                  </div>
+                </div>`;
+            }).join('')}
+          </aside>
+          <div class="imsg-chat">
+            <div class="imsg-chat-header">
+              ${side.name}
+              <div class="tag">scenario: ${escapeHtml(s.title)}</div>
+            </div>
+            <div class="imsg-messages">
+              <div class="imsg-date"><strong>eval run</strong> · ${escapeHtml(label)}</div>
+              ${bubbles}
+            </div>
+            <div class="imsg-composer">
+              <div class="field"><span>iMessage</span><span>◎</span></div>
+              <div class="ico">↑</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      ${s.rubric ? scoreCard(s.rubric, isBest) : ''}`;
+
+    // wire sidebar clicks
+    root.querySelectorAll('.imsg-convo[data-sid]').forEach(el => {
+      el.addEventListener('click', () => {
+        activeScenarioBy[folder] = el.dataset.sid;
+        renderWindow(folder, lrStr, rank, score, scenarios);
+      });
+    });
+  }
+
+  // initial render: select the winning (best) row
+  const bestRow = sweepRoot.querySelector('.sweep-row');
+  if (bestRow) {
+    selectRun(bestRow.dataset.folder, bestRow.dataset.lr, parseInt(bestRow.dataset.rank,10), parseFloat(bestRow.dataset.score), bestRow);
+  }
+})();
+</script>
+
+<script>
+// Hook chat: play messages in sequence when scrolled into view
+(function(){
+  const chat = document.getElementById('hook-chat');
+  if (!chat) return;
+  const items = Array.from(chat.querySelectorAll('.hook-item'));
+  let played = false;
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  async function play() {
+    if (played) return;
+    played = true;
+    // Show the date header immediately (no animation delay needed)
+    items[0].classList.add('show');
+    await sleep(300);
+
+    for (let i = 1; i < items.length; i++) {
+      const el = items[i];
+      const type = el.dataset.type;
+      if (type === 'typing') {
+        el.classList.add('show');
+        const bub = el.querySelector('.typing-bubble');
+        // reveal the gray bubble itself on the next frame, then stagger dots
+        requestAnimationFrame(() => bub && bub.classList.add('in'));
+        const dots = el.querySelectorAll('.typing-bubble span');
+        dots.forEach((d, idx) => {
+          setTimeout(() => d.classList.add('in'), 140 + idx * 160);
+        });
+        const dwell = parseInt(el.dataset.dwell || '800', 10);
+        await sleep(dwell);
+        // fade typing bubble out, then collapse the row
+        el.classList.add('fading');
+        await sleep(200);
+        el.style.display = 'none';
+      } else {
+        // subtle "send" whoosh: play the pop
+        el.classList.add('show');
+        // short gap between same-sender bubbles, longer between senders / before typing
+        const next = items[i+1];
+        const nextSide = next && (next.classList.contains('me') ? 'me' : (next.classList.contains('them') || next.dataset.type === 'typing' ? 'them' : null));
+        const curSide = el.classList.contains('me') ? 'me' : 'them';
+        const gap = !next ? 300 :
+                    next.dataset.type === 'typing' ? 900 :   // give the user a beat before the grey "..." begins
+                    nextSide !== curSide ? 450 :
+                    260;
+        await sleep(gap);
+      }
+      // keep scroll pinned to the bottom of the chat window while new msgs arrive
+      chat.scrollTop = chat.scrollHeight;
+    }
+  }
+
+  // reduced-motion: reveal everything instantly
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    items.forEach(el => {
+      if (el.dataset.type !== 'typing') el.classList.add('show');
+    });
+    return;
+  }
+
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) { play(); io.disconnect(); break; }
+    }
+  }, { threshold: 0.35 });
+  io.observe(chat);
+})();
+</script>
+
+<script>
+// Glass nav: slide underline to active section as page scrolls
+(function(){
+  const nav = document.getElementById('glass-nav');
+  if (!nav) return;
+  const underline = document.getElementById('nav-underline');
+  const links = Array.from(nav.querySelectorAll('a[data-target]'));
+  const sections = links
+    .map(a => ({ link: a, section: document.getElementById(a.dataset.target) }))
+    .filter(p => p.section);
+
+  function setActive(idx) {
+    links.forEach((l, i) => l.classList.toggle('active', i === idx));
+    const link = links[idx];
+    if (!link || !underline) return;
+    // measure relative to the .nav-track parent
+    const track = link.parentElement;
+    const trackRect = track.getBoundingClientRect();
+    const linkRect = link.getBoundingClientRect();
+    const left = linkRect.left - trackRect.left;
+    const width = linkRect.width;
+    // the underline sits at bottom: -1px of nav-track; use transform+width for smooth animation
+    underline.style.transform = `translateX(${left}px)`;
+    underline.style.width = `${width}px`;
+  }
+
+  function update() {
+    const probeY = window.innerHeight * 0.33;
+    let activeIdx = 0;
+    for (let i = 0; i < sections.length; i++) {
+      const top = sections[i].section.getBoundingClientRect().top;
+      if (top <= probeY) activeIdx = i;
+    }
+    // if we're above the first section entirely, use -1 to hide underline
+    const firstTop = sections[0].section.getBoundingClientRect().top;
+    if (firstTop > probeY) {
+      underline.style.width = '0px';
+      links.forEach(l => l.classList.remove('active'));
+      return;
+    }
+    setActive(activeIdx);
+  }
+
+  let ticking = false;
+  window.addEventListener('scroll', () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => { update(); ticking = false; });
+  }, { passive: true });
+  window.addEventListener('resize', update);
+  // defer until fonts / layout settle
+  setTimeout(update, 60);
+  setTimeout(update, 400);
+})();
+</script>
+
+</body>
+</html>
