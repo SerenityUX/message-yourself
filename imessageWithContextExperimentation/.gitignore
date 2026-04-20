@@ -25,5 +25,12 @@ cpt_out.txt
 messages_export.txt
 
 **/sft_tinker_api_dump.json
+**/sft_tinker_metadata.json
 
-# experiment_results/ — tracked (eval JSON, rubrics)
+# experiment_results/ — local only (manifests contain tinker:// + disk paths)
+experiment_results/*
+!experiment_results/.gitkeep
+experiment_results-2/*
+!experiment_results-2/.gitkeep
+experiment_results-3/*
+!experiment_results-3/.gitkeep

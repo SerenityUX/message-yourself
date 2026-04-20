@@ -18,3 +18,4 @@ models/
 
 cpt_out.txt
 messages_export.txt
+sft_tinker_metadata.json

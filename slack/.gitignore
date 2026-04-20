@@ -29,3 +29,7 @@ my_slack_messages*.json
 **/tinker_api_full_response.json
 
 cpt_out.txt
+
+# Local Tinker registry / captures (paths + tinker:// in JSON)
+outputted_models.json
+rl_api_full_response.json

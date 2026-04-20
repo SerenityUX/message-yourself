@@ -34,6 +34,8 @@ messages_export.txt
 
 # --- Tinker request/response dumps (large; may echo payloads) ---
 **/sft_tinker_api_dump.json
+**/sft_tinker_metadata.json
 
-# --- Intentionally NOT listed (tracked in git) ---
-# experiment_results/   — scenario JSON, rubrics, manifests, agent logs, base_results/
+# experiment_results/ — local only (tinker:// URIs, rubrics, API dumps)
+experiment_results/*
+!experiment_results/.gitkeep

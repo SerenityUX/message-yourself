@@ -123,6 +123,12 @@ my_slack_messages*.json
 **/tinker_api_full_response.json
 **/rl_tinker_metadata.json
 
+# --- Tinker checkpoint metadata & local registries (absolute paths, tinker:// URIs) ---
+**/sft_tinker_metadata.json
+my_results.json
+slack/outputted_models.json
+slack/rl_api_full_response.json
+
 # --- Logs & temp ---
 *.log
 tmp/
